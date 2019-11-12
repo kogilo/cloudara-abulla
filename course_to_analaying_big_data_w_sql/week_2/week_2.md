@@ -624,8 +624,7 @@ impala-shell --delimited --print_header -q  'SELECT * FROM fun.games'
 
 
 * Suppose you want your query results to output to the terminal in this format:
-
-1,Monopoly,Elizabeth Magie,1903,8,2,6,19.99
+`1,Monopoly,Elizabeth Magie,1903,8,2,6,19.99
 
 2,Scrabble,Alfred Mosher Butts,1938,8,2,4,17.99
 
@@ -635,7 +634,8 @@ impala-shell --delimited --print_header -q  'SELECT * FROM fun.games'
 
 5,Risk,Albert Lamorisse,1957,10,2,5,29.99
 
-Which commands will produce this? Check all that apply.
+Which commands will produce this? Check all that apply.`
+
 
 ~~~~sql
 beeline -u jdbc:hive2://localhost:10000 --outputformat=csv2 --showHeader=false -e 'SELECT * FROM fun.games;'
@@ -703,7 +703,7 @@ impala-shell --delimited --output_delimiter=',' --print_header -q 'SELECT id, na
 
 * Which is a correct command for saving query results as a comma-delimited file? Check all that apply. (Try these in the VM, and see what error messages say—you might learn something new to try!)
 
-impala-shell -q 'SELECT id, name FROM fun.games' --delimited --output_delimiter=',' --print_header -o games.csv
+  * `impala-shell -q 'SELECT id, name FROM fun.games' --delimited --output_delimiter=',' --print_header -o games.csv`
 
 
-beeline -u jdbc:hive2://localhost:10000 --outputformat=csv2 -e 'SELECT id, name FROM fun.games' > games.csv
+  * `beeline -u jdbc:hive2://localhost:10000 --outputformat=csv2 -e 'SELECT id, name FROM fun.games' > games.csv`
