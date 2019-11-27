@@ -726,3 +726,78 @@ Un-selected is correct
 * To restore the VM’s background color to its original setting, run the command:
 
 * `gconftool-2 -t str -s /desktop/gnome/background/primary_color "#00629B"`
+
+# Querying Hive and Impala in Scripts and Applications
+* **Other Interfaces**
+  * ODBC
+  * JDBC
+  * Apache Thrift
+* One major benefit of using these interfaces to query Hive or Impala is portability. The drivers or libraries that are required to use them can be installed on virtually any computer.
+* Example using Python package called `impyla`
+* type python in the shell
+~~~~sql
+from impala.dbapi import connect
+conn = connect(host='localhost', port=21050)
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM fun.games')
+results = cursor.fetchall()
+for row in results:
+  print row
+~~~~
+
+## Week 3 Honors Quiz
+
+* Question 1
+  * You have a file called report.sql with the following query in it:
+~~~~sql
+SELECT * FROM accounting.current WHERE month= '${var:month}';
+~~~~
+  * Which command will run this query correctly for the month October?
+
+
+$ beeline -u jdbc:hive2://localhost:10000 --hivevar month="October" -f report.sql
+
+`$ impala-shell --var month="October" -f report.sql
+`
+
+
+$ beeline -u jdbc:hive2://localhost:10000 --var month="October" -f report.sql
+
+
+$ impala-shell --impalavar month="October" -f report.sql
+
+
+$ beeline -u jdbc:hive2://localhost:10000 -h month="October" -f report.sql
+
+
+$ impala-shell -v month="October" -f report.sql
+
+
+
+
+.Question 2
+Which will properly use either Beeline or Impala Shell to run a file of SQL commands from within a shell script?
+
+
+$ impala-shell -f filename
+
+Correct
+Correct. To run the query from within a shell script, use the same command as you would from the command line.
+
+
+$ impala-shell -s filename
+
+
+$ beeline -u jdbc:hive2://localhost:10000 -e filename
+
+
+$ impala-shell -q filename
+
+
+$ beeline -u jdbc:hive2://localhost:10000 -s filename
+
+
+$ beeline -u jdbc:hive2://localhost:10000 -f filename
+
+Correct
+Correct. To run the query from within a shell script, use the same command as you would from the command line.
