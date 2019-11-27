@@ -272,4 +272,396 @@ SELECT * FROM fun.games
 
 
   * NOT IN: true when no matches exist
-  * NOT BETWEEN: true when outside the range. 
+  * NOT BETWEEN: true when outside the range.
+
+
+# Working with Missing Values
+
+## Understanding Missing Values
+* For example, if the price of some board game is unknown, then it's impossible to determine whether that price is less than $10. Maybe it's less, maybe it's more, maybe it's exactly $10, you have no way of knowing.
+* Life would be easier if you never had to work with missing values. But the reality is that many datasets have them, and as a data analyst, you'll need to handle them properly.
+* `In SQL, a null value is a value that's missing or unknown.`
+* Tables with NULL Values
+  * default: `offices`
+  * fun: `inventory`, `card_rank`
+* NULL value can meant => `not applicable, unknown, undefined`
+
+* There are many datasets in the real world that have more missing values than non missing values. These are referred to as sparse datasets.
+* try writing a query to find this flight in the flights table. It was on January 15th, 2009, the carrier is US, the flight number is 1549, and the origin airport is LGA. After you write and run a query that returns that row, take a look at which column values are missing in this row.
+* missing values can make it impossible to determine whether some conditions are true or false.
+~~~~sql
+SELECT * FROM fun.inventory
+WHERE price < 10
+~~~~
+
+* This query will return a results including these items with missing values.
+* Null constraints can prevent data with null values from being loaded into the database in the first place, but distributed SQL engines like Hive and Impala, do not generally support these constraints.
+
+## Handling Missing Values
+* You cannot test for NULL using =, <, >, ...
+* The following are not working:
+~~~~sql
+SELECT * FROM inventory WHERE price = NULL;
+
+SELECT * FROM inventory WHERE price != NULL;
+~~~~
+
+* Any value compared to NULL evaluates to null
+* Examples:
+~~~~sql
+5 = NULL  => NULL
+5 != NULL => NULL
+5 < NULL => NULL
+NULL = NULL => NULL
+NULL != NULL => NULL
+~~~~
+* The best way to understand these is to remember that null means some unknown value.
+
+
+* Use column `IS NULL` to check for NULL values,
+* Or use column `IS NOT NULL` to check for non-NULL values.
+
+* Example to return the row with `price = NULL`
+~~~~sql
+SELECT * FROM fun.inventory WHERE price IS NULL;
+~~~~
+* When you want the rows where price is not NULL.
+~~~~sql
+SELECT * FROM fun.inventory WHERE price IS NOT NULL;
+~~~~
+
+* Comparisons that accommodate Null
+  * ` IS DISTINCT FROM `
+  * ` IS NOT DISTINCT FROM `
+* See the example:
+  * `offices` table has 4 rows representing 4 different offices;
+  * What if you want to write a query to filter office not in `Illinois`?
+  * You may write:
+~~~~sql
+SELECT * FROM default.office
+WHERE state_province != 'Illinois';
+~~~~
+* This will exclude the `office in Singapore` which as no state_province.
+* This is where the `DISTINCT FROM` is useful.
+~~~~sql
+SELECT * FROM default.office
+WHERE state_province Is DISTINCT FROM 'Illinois';
+~~~~
+* Seeeee..
+~~~~sql
+NULL != not-NULL value => NULL
+NULL IS DISTINCT FROM non-NULL => true
+~~~~
+
+* Negation
+~~~~sql
+NULL = non-NULL value  => NULL
+NULL IS NOT DISTINCT FROM non-NULL => false
+
+NULL = NULL => NULL
+NULL IS NOT DISTINCT FROM NULL => true
+~~~~
+
+* Short hand operators
+`<=>`
+
+
+
+
+## Conditional Functions
+* `if`
+* Example:
+~~~~sql
+SELECT shop, game,
+  if(price IS NULL, 8.99, price)
+  AS correct_price
+FROM fun.inventory;
+~~~~
+* Check each row to test if the price is nULL. If found to be NULL, then replace it with 8.99.
+* Anther example:
+~~~~sql
+SELECT shop, game,
+  if(price > 10,
+  'high price',
+  'low or missing price')
+  AS price_catagory
+FROM fun.inventory;
+~~~~
+* If the price is not less than 10, return `high price` and if it is less than 10, return `low or missing price`
+* if clause used to return one or two different expression.
+
+* `CASE` takes many arguments
+  * Example
+
+~~~~sql
+SELECT shop, game, price,
+  CASE WHEN price IS NULL THEN
+          'missing price'
+      WHEN price > 10 THEN
+          'high price'
+      ELSE 'low price'
+  END AS price_catagory
+FROM fun.inventory;
+~~~~
+
+
+* `nullif` takes 2 arguments
+* example
+~~~~sql
+SELECT distance / nullif(air_time, 0) * 60 AS avg_speed
+FROM fly.flights;
+~~~~
+
+* `ifnull`
+~~~~sql
+SELECT ifnull(air_time, 340)  AS air_tiome-no_nulls
+FROM fly.flights
+WHERE origin = 'EWR' AND dest = 'SFO';
+~~~~
+* Replace the null value with `340`
+
+* `coalesce` can take any number of agru   and it return the values of the first argument if it is not null.
+
+* Example
+~~~~sql
+SELECT coalesce(arr_time, sced_arr_time) AS real_or_sched_arr_time
+FROM fly.flights;
+~~~~
+
+
+
+
+
+# Using Variables with Beeline and Impala Shell
+
+## Variable Substitution
+### Using `HIVE`
+~~~~sql
+-- return the list price of the game
+SELECT list_price FROM fun.games WHERE name = 'Monopoly';
+
+-- return the prices of the game at game shops
+SELECT shop, price FROM fun.games WHERE name = 'Monopoly';
+~~~~
+* Variable Substitution come in place here.
+
+~~~~sql
+-- set a Variable containing the name of the game
+SET hivevar:game=Monopoly; --no space after SET
+-- return the list price of the game
+SELECT list_price FROM fun.games WHERE name = '${hivevar:game}';
+-- return the prices of the game at game shops
+SELECT shop, price FROM fun.games WHERE name = 'Monopoly';
+
+~~~~
+* `beeline -u .... -f game_prices.sql`
+* Then when you execute the statements in the SQL file using the Beeline command with the dash f option. Hive replaces each instance of this dollar sign curly brace hivevar placeholder with the value that's assigned to the variable. In other words, it substitutes the assigned value in each of these places.
+
+
+* When you have a sql statment in a file but you want to run it many times;
+
+* `hex_color.sql`
+~~~~sql
+SELECT hex FROM wax.crayons WHERE color = 'Red';
+~~~~
+* If you want the run this same query with different color, it will be cumbersome.
+~~~~sql
+SELECT hex FROM wax.crayons WHERE color = 'Orange';
+
+SELECT hex FROM wax.crayons WHERE color = 'Yellow';
+
+SELECT hex FROM wax.crayons WHERE color = 'Green';
+~~~~
+
+* Use variable Substitution:
+
+~~~~sql
+SELECT hex FROM wax.crayons WHERE color = '${hivevar:color}';
+~~~~
+* Then, use commend line argument:
+~~~~sql
+beeline -u ...  --hivevar color="Red" -f hex_color.sql
+
+beeline -u ...  --hivevar color="Orange" -f hex_color.sql
+
+beeline -u ...  --hivevar color="Yellow" -f hex_color.sql
+~~~~
+
+
+* You can also use different variables
+~~~~sql
+SELECT color FROM wax.crayons
+  WHERE red = ${hivevar:red} AND
+        green = ${hivevar:green} AND
+        blue = ${hivevar:blue};
+~~~~
+~~~~sql
+beeline -u ... --hivevar red="238" \
+              --hivevar green="32" \
+             --hivevar blue="77" \
+              -f color_from_rgb.sql    
+~~~~
+
+
+* With Impala sheel --- use var
+
+~~~~sql
+SELECT hex FROM wax.crayons WHERE color = '${var:color}';
+~~~~
+
+~~~~sql
+impala-sheel --var color="Purple Mountains\' Majesty"/
+-f hex_color.sql
+~~~~
+
+
+Which commands correctly pass a string parameter called month to a Beeline or Impala Shell query that runs the file report.sql? (Assume the variable is appropriately defined in report.sql.) Check all that apply.
+
+~~~~sql
+$ beeline -u jdbc:hive2://localhost:10000  --var month="January" -f report.sql
+
+Un-selected is correct
+
+$ impala-shell  --var month="January" -f report.sql
+
+Correct
+Correct. This will run the file using "January" in place of the parameter month.
+
+
+$ impala-shell  -v month="January" -f report.sql
+
+Un-selected is correct
+
+$ beeline -u jdbc:hive2://localhost:10000  -h month="January" -f report.sql
+
+Un-selected is correct
+
+$ impala-shell  --impalavar month="January" -f report.sql
+
+Un-selected is correct
+
+$ beeline -u jdbc:hive2://localhost:10000  --hivevar month="January" -f report.sql
+
+Correct
+Correct. This will run the file using "January" in place of the parameter month.
+~~~~
+
+
+# Calling Beeline and Impala Shell from Scripts
+* shell Scripts sometimes callled `BASH SCRIPT`
+
+
+
+
+#!/bin/bash
+impala-shell \
+--quiet \
+--delimited \
+--output_delimiter=','\
+--print_header \
+-q 'SELECT * FROM fly.flights
+WHERE air_time =0;' \
+-o zero_air_time.csv
+mail \
+-a zero_air_time.csv \
+-s 'flights with zero air_time' \
+'Do you know why zero_air_time is zero in these rows?'
+
+
+* Then use:
+`chmod 755 email_results.sh` at commend line
+* You can execute a shell script
+  * At the command line
+  `/.email_results.sh`
+
+  * Using a scheduler
+  * From another script or application
+    * in Python
+     import subprocess
+     subprocess.call(['./email_results.sh'])
+
+* To try this on the VM:
+  * Create email_results.sh, replacing the email address with your own
+  * Run the chmod command
+  * Run the script
+    Note: whether the email is sent depends ou your configurations.
+
+* When invoking commands in a script:
+  * Enter the commands as you would in the command line
+  -whether for Beeline or Impala shell
+  * Use Linux commands to process results.
+
+
+  # Book to read.
+  Shell Scripting
+  bash
+  bask pocket reference
+
+  grep
+  sed & awk
+
+
+
+  Which will properly use either Beeline or Impala Shell to run a SQL query from within a shell script? Check all that apply.
+
+
+$ beeline -u jdbc:hive2://localhost:10000 -s 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+
+$ impala-shell -f 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+
+$ beeline -u jdbc:hive2://localhost:10000 -f 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+
+$ beeline -u jdbc:hive2://localhost:10000 -e 'SELECT * FROM db.table_name'
+
+Correct
+Correct. To run the query from within a shell script, use the same command as you would from the command line. For Beeline, use the -e option.
+
+
+$ impala-shell -q 'SELECT * FROM db.table_name'
+
+Correct
+Correct. To run the query from within a shell script, use the same command as you would from the command line. For Impala Shell, use the -q option.
+
+
+$ impala-shell -s 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+
+
+
+Suppose that, as you are working, you need to run a bash script query_script.sh with a SQL query in it. (That is, you want to run it now, not schedule it for later.) You have never run this script before. Which of the following is necessary to run the script? Check all that apply. (Note that the order provided might not match the order in which you need to proceed.)
+
+
+Run the script from the command line using $ ./query_script.sh (assuming it is in your current directory)
+
+Correct
+Correct. This is the command to run a bash script.
+
+
+Run the script from the Impala Shell or Beeline shell using BASH query_script.sh; (assuming it is in your current directory)
+
+Un-selected is correct
+
+Give permission to the script using chmod
+
+Correct
+Correct. All bash scripts (with or without SQL commands) must have permission to execute. The chmod command can provide that permission.
+
+
+Use the root or superuser privileges when issuing the run command, so the script has permissions to run
+
+Un-selected is correct
+
+Run the script from the Impala Shell or Beeline shell using RUN query_script.sh; (assuming it is in your current directory)
+
+Un-selected is correct
+
+Run the script from the command line using $ bash query_script.sh (assuming it is in your current directory)
+
+Un-selected is correct
