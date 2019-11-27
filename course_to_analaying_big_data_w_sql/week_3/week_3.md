@@ -602,66 +602,127 @@ mail \
 
 
 
-  Which will properly use either Beeline or Impala Shell to run a SQL query from within a shell script? Check all that apply.
+  * Which will properly use either Beeline or Impala Shell to run a SQL query from within a shell script? Check all that apply.
 
 
-$ beeline -u jdbc:hive2://localhost:10000 -s 'SELECT * FROM db.table_name'
+    * $ beeline -u jdbc:hive2://localhost:10000 -s 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+---
+  * $ impala-shell -f 'SELECT * FROM db.table_name'
+
+Un-selected is correct
+---
+  * $ beeline -u jdbc:hive2://localhost:10000 -f 'SELECT * FROM db.table_name'
 
 Un-selected is correct
 
-$ impala-shell -f 'SELECT * FROM db.table_name'
-
-Un-selected is correct
-
-$ beeline -u jdbc:hive2://localhost:10000 -f 'SELECT * FROM db.table_name'
-
-Un-selected is correct
-
-$ beeline -u jdbc:hive2://localhost:10000 -e 'SELECT * FROM db.table_name'
+  * `$ beeline -u jdbc:hive2://localhost:10000 -e 'SELECT * FROM db.table_name'`
 
 Correct
 Correct. To run the query from within a shell script, use the same command as you would from the command line. For Beeline, use the -e option.
 
-
-$ impala-shell -q 'SELECT * FROM db.table_name'
+---
+  * `$ impala-shell -q 'SELECT * FROM db.table_name'`
 
 Correct
 Correct. To run the query from within a shell script, use the same command as you would from the command line. For Impala Shell, use the -q option.
 
-
-$ impala-shell -s 'SELECT * FROM db.table_name'
+---
+  * $ impala-shell -s 'SELECT * FROM db.table_name'
 
 Un-selected is correct
 
+---
 
+* Suppose that, as you are working, you need to run a bash script query_script.sh with a SQL query in it. (That is, you want to run it now, not schedule it for later.) You have never run this script before. Which of the following is necessary to run the script? Check all that apply. (Note that the order provided might not match the order in which you need to proceed.)
 
-Suppose that, as you are working, you need to run a bash script query_script.sh with a SQL query in it. (That is, you want to run it now, not schedule it for later.) You have never run this script before. Which of the following is necessary to run the script? Check all that apply. (Note that the order provided might not match the order in which you need to proceed.)
-
-
-Run the script from the command line using $ ./query_script.sh (assuming it is in your current directory)
+* Run the script from the command line using `$ ./query_script.sh` (assuming it is in your current directory)
 
 Correct
 Correct. This is the command to run a bash script.
+---
 
-
-Run the script from the Impala Shell or Beeline shell using BASH query_script.sh; (assuming it is in your current directory)
+* Run the script from the Impala Shell or Beeline shell using `BASH query_script.sh;` (assuming it is in your current directory)
 
 Un-selected is correct
-
-Give permission to the script using chmod
+---
+* Give permission to the script using `chmod`
 
 Correct
 Correct. All bash scripts (with or without SQL commands) must have permission to execute. The chmod command can provide that permission.
+---
 
-
-Use the root or superuser privileges when issuing the run command, so the script has permissions to run
-
-Un-selected is correct
-
-Run the script from the Impala Shell or Beeline shell using RUN query_script.sh; (assuming it is in your current directory)
+* Use the root or superuser privileges when issuing the run command, so the script has permissions to run
 
 Un-selected is correct
 
-Run the script from the command line using $ bash query_script.sh (assuming it is in your current directory)
+* Run the script from the Impala Shell or Beeline shell using RUN query_script.sh; (assuming it is in your current directory)
 
 Un-selected is correct
+
+* Run the script from the command line using $ bash query_script.sh (assuming it is in your current directory)
+
+Un-selected is correct
+
+### Important: Read the entire exercise before starting!
+
+* In this exercise, you will write a `shell script that prompts the user to enter a crayon color, queries the hexadecimal code` for that color from the crayons table in the wax database, and uses that hexadecimal code to set the VM’s desktop background to that color.
+* Begin with this partially completed shell script. The first line (after the `#!/bin/bash)` prompts the user to enter the name of a color, and the last line sets the color of the desktop background using a hexadecimal color code:
+* `#!/bin/bash read -p "Enter the name of a crayon color: " COLOR`
+`⋮`
+
+
+* `gconftool-2 -t str -s /desktop/gnome/background/primary_color "#$HEX"`
+
+* Your task is to fill in the missing lines, to:
+  * 1. Invoke Beeline or Impala Shell to query the crayons table, using the environment variable named `COLOR` in the WHERE clause of the SELECT statement, and return the hexadecimal color code.
+  * 2. Assign the returned six-character hexadecimal color code to the environment variable named `HEX`.
+
+* This is intended to be a difficult exercise. You might need to learn some more about shell scripting to complete it. There is more than one correct solution. Start with a basic solution, then later, if you like, you can improve your script to gracefully handle edge cases and to avoid possible errors. (For example, what if the user enters a color name that’s not in the crayons table?) Click here for solutions and how to return to the original color.
+
+
+### Change VM Desktop Color (Solution)
+* Here are two possible solutions. Other solutions are possible.
+
+* You will need to change the permissions on the shell script file to allow you to execute it:
+
+* `chmod 755 change_background.sh:`
+* Then to run the shell script:
+* `./change_background.sh:`
+
+### Solution 1
+* `change_background.sh:`
+
+* `read -p "Enter the name of a crayon color: " COLOR`
+
+* `QUERY="SELECT hex FROM wax.crayons WHERE lower(color) = lower('$COLOR')"`
+
+* `HEX=$(impala-shell --delimited -q "$QUERY")`
+
+* `gconftool-2 -t str -s /desktop/gnome/background/primary_color "#$HEX"`
+
+
+### Solution 2
+* `This solution uses variable replacement with a SQL script file:`
+
+* `get_color_hex.sql:`
+
+* `SELECT hex FROM wax.crayons WHERE lower(color) = lower('${var:color}')`
+
+* `change_background.sh:`
+
+* `read -p "Enter the name of a crayon color: " COLOR`
+
+* `HEX=$(impala-shell --delimited --var=color="$COLOR" -f get_color_hex.sql)`
+
+* `gconftool-2 -t str -s /desktop/gnome/background/primary_color "#$HEX"`
+
+
+### Limitations
+* The suggested solutions above do not perform inexact matching or handle possible errors. If there is no match, then the result will be that the background changes to black. These solutions also do not automatically escape apostrophes.
+
+### Restoring the Original Background Color
+* To restore the VM’s background color to its original setting, run the command:
+
+* `gconftool-2 -t str -s /desktop/gnome/background/primary_color "#00629B"`
