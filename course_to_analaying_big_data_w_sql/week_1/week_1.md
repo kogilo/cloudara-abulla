@@ -176,3 +176,5 @@ SELECT name, list_price FROM games;
 * The command to quit Impala shell is different than in Beeline. It's the word `quit` with no exclamation mark before it, and in Impala shell you do need to terminate the quit command with a semicolon.
 
 * A few more things they have in common. In both, you can clear the screen by pressing "Control+L". In both when you execute a query, the entire results set is returned and printed to the screen, not just 100 rows like in the You Query Editors. In both you can cancel a query by pressing "Control+C". Later in the course, you'll learn about more ways to use Beeline and Impala shell.
+
+* 
