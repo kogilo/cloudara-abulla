@@ -278,3 +278,229 @@ SELECT min_age, COUNT(*) FROM fun.games GROUP BY min_age;
 
 
 # Choosing an Aggregate Function and Grouping Column
+* When you write a `SQL query` that uses `aggregation` and `grouping`, you need to choose which aggregation function to use and which column to group by.
+* Example-1: `How many different games are in stock at each shop?`
+  * Since each `row` in the inventory table represents a different game in a different shop, you can answer this question by `counting rows` using the `count` function.
+  * Since it's asking at each shop, you need to group by the `shop column`.
+  * So to answer this question, you would use the query `SELECT shop, count (star) FROM inventory GROUP BY shop`.
+  ~~~~sql
+  SELECT shop, COUNT(*)
+    FROM inventory
+    GROUP BY shop;
+  ~~~~
+* Example-2: How many total games are in stock at each shop? In other words, how many total copies of the games are in stock at each shop?
+  * To answer this you need to use the aggregate function `sum` to add up the values in the quantity column, and again `GROUP BY shop`.
+  ~~~~sql
+  SELECT shop, SUM(qty)
+    FROM inventory
+    GROUP BY shop;
+  ~~~~
+
+* With questions like these, `language can be ambiguous`.
+  * If someone asks `how many games?`
+  * Do they mean `how many different games or how many total copies of the games?`
+  * When you're working as a data analyst, if you're asked an ambiguous question like this, `you should ask for clarification` or `make some reasonable assumptions` and then clearly communicate the assumptions when you share your results.
+  * Another question: "How many total copies of each game are in stock?"
+  * In this question the grouping of interests is not shops, it's games. So to answer this question you would use a select statement like this. SELECT game, sum (quantity) as total quantity FROM inventory GROUP BY game.
+
+  ~~~~sql
+  SELECT game,
+    SUM(qty) AS total_qty
+    FROM inventory
+    GROUP BY game;
+  ~~~~
+
+  * But once again, questions like this can be ambiguous.
+    * How many total copies of each game are in stock `at both shops in combined?`
+
+    ~~~~sql
+    SELECT game,
+      SUM(qty) AS total_qty
+      FROM inventory
+      GROUP BY game;
+    ~~~~
+* Maybe the intent was to count the copies of each game separately for each shop.
+  * How many total copies of each games are in stock `at each shop`?
+  ~~~~sql
+  SELECT shop, game, qty
+    FROM inventory;
+  ~~~~
+
+  * Write and run a query on the `fly.planes` table that would answer the question, `"What is the average number of seats for each type of aircraft in the table?"` Then use the results to enter the average number of seats for the blimps/dirigibles in the table.
+
+  ~~~~sql
+  SELECT type, ROUND(AVG(seats))
+    FROM planes
+    GROUP BY type;
+  ~~~~
+
+# Grouping Expressions
+* Ways to specify a GROUP BY clause:
+  * Column reference:
+  ~~~~sql
+    GROUP BY min_age
+    GROUP BY max_players
+  ~~~~
+
+  * Grouping expression:
+  ~~~~sql
+    GROUP BY list_price < 10
+    GROUP BY if(list_price<10, 'low price', 'high price')
+    GROUP BY CASE
+        WHEN list_price<10 THEN 'low price'
+        ELSE 'high price'
+      END
+  ~~~~
+
+  ## NB. Using grouping expression in both GROUP BY clause and SELECT list
+  * So in this example, to count how many games are in each of these two price categories, you would use the SELECT statement.
+
+  ~~~~sql
+  SELECT list_price<10, COUNT(*)
+    FROM games
+    GROUP BY list_price < 10;
+  ~~~~
+* Column alias (with some SQL engines)
+~~~~sql
+SELECT list_price<10 AS low_price, COUNT(*)
+    FROM games
+    GROUP BY low_price;
+~~~~
+* This shortcut is not working with HIVE
+
+### Quiz:
+
+Which of these expressions runs without error in Hive? Check all that apply. (If needed, check your answers by attempting to run these queries in Hive.)
+
+~~~~sql
+SELECT low_price, COUNT(*) FROM fun.games GROUP BY list_price < 10 AS low_price;
+
+---Un-selected is correct
+SELECT low_price, COUNT(*) FROM fun.games GROUP BY list_price < 10 AS low_price;
+
+---is not selected.This is correct.
+
+SELECT list_price < 10, COUNT(*) FROM fun.games GROUP BY list_price < 10;
+
+
+---Correct. The expression in the GROUP BY clause is the only non-aggregate expression in the SELECT list.
+
+SELECT list_price < 10, COUNT(*) FROM fun.games GROUP BY list_price < 10;
+
+---is selected.This is correct.
+---Correct. The expression in the GROUP BY clause is the only non-aggregate expression in the SELECT list.
+
+
+SELECT list_price < 10 AS low_price, COUNT(*) FROM fun.games GROUP BY list_price < 10;
+
+---Correct
+---Correct. The expression in the GROUP BY clause is the only non-aggregate expression in the SELECT list.
+
+SELECT list_price < 10 AS low_price, COUNT(*) FROM fun.games GROUP BY list_price < 10;
+
+---is selected.This is correct.
+---Correct. The expression in the GROUP BY clause is the only non-aggregate expression in the SELECT list.
+
+
+SELECT list_price < 10 AS low_price, COUNT(*) FROM fun.games GROUP BY low_price;
+
+---Un-selected is correct
+
+~~~~
+* Two or more of the above :
+~~~~sql
+SELECT min_age, max_players, COUNT(*)
+  FROM games
+  GROUP BY min_age, max_players;
+~~~~
+  - It splits the data into groups by the first column specified in the GROUP BY clause. And then splits those groups further by the next column specified and so on. Finally, it computes the specified aggregates on those groups.
+
+* This example uses column references in the GROUP BY list. But the items the list can be color reference, expression and column areas if the SQL engine support them in the group by clause.
+~~~~sql
+SELECT min_age, max_players, COUNT(*)
+  FROM games
+  GROUP BY min_age, max_players;
+~~~~
+
+* Using example that uses a column reference and an expression.
+~~~~sql
+SELECT min_age, list_price<10, COUNT(*)
+  FROM games
+  GROUP BY min_age, list_price<10;
+~~~~
+
+* If you're using a SQL engine that allow aliases in the GROUP BY clause, then you could rewrite the statement this way to avoid repeating the expression.
+~~~~sql
+SELECT min_age,
+       list_price<10 AS low_price,
+       COUNT(*)
+  FROM games
+  GROUP BY min_age, low_price;
+~~~~
+
+# Quiz
+* Run this query in the VM using Impala. Then use the result set to answer the following question.
+~~~~sql
+SELECT list_price > 20 AS over_20, max_players, COUNT(*)
+
+ ​   FROM fun.games
+
+ ​   GROUP BY over_20, max_players;
+
+---How many games cost more than $20 and have a maximum of 6 players?
+
+---AN. No games in the games table have both a price greater than $20 and a maximum of 6 players. Since the table data has no rows in this group, the result set does not include a row representing this group.
+~~~~
+
+
+# Grouping and Aggregation, Together and Separately
+  * aggregation without Grouping
+  ~~~~sql
+  SELECT COUNT(*)
+    FROM games;
+  ~~~~
+
+* You can also use two or more aggregate expressions in the select list with no GROUP BY clause.
+  ~~~~sql
+  SELECT COUNT(*),
+          MIN(list_price),
+          MAX(list_price)
+    FROM games;
+  ~~~~
+* Grouping without Aggregation:
+  * When using GROUP BY, the SELECT list can have only:
+    - Aggregate Expressions
+    - Expressions used in GROUP BY
+    - Literal values
+~~~~sql
+SELECT min_age FROM games
+GROUP BY min_age,
+---But you better do it like this:
+SELECT DISTINCT min_age FROM games;
+---It is better only when you are using the aggregate;
+~~~~
+
+* Grouping with Aggregation
+~~~~sql
+SELECT min_age, MAX(list_price)
+  FROM games
+  GROUP BY min_age;
+--with litral value:
+SELECT min_age
+  round(AVG(list_price), 2)
+    AS avg_list_price,
+    0.21 AS tax_rate,
+    round(AVG(list_price)*1.21, 2)
+    AS avg_w_tax
+  FROM games
+  GROUP BY min_age;
+~~~~
+* The Questinable Behavior of MYSQL
+~~~~sql
+SELECT * FROM games GROUP BY min_age;
+
+--similarly
+SELECT min_age, list_price
+  FROM games
+  GROUP BY min_age;
+~~~~
