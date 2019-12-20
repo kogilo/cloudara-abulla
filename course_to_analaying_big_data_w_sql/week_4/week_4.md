@@ -504,3 +504,478 @@ SELECT min_age, list_price
   FROM games
   GROUP BY min_age;
 ~~~~
+
+
+
+# NULL Values in Grouping and Aggregation
+* see
+~~~~sql
+SELECT * FROM inventory;
+--null price and aisle
+
+SELECT shop, game, round(price*1.21, 2 ) AS price_with_tax
+    FROM inventory;
+
+    --null * 1.21 --> NULL
+~~~~
+* Any value compared to NULL is NULL
+
+~~~~sql
+SELECT shop, game, price < 10 AS price_under_ten
+    FROM inventory;
+    ---NULL <10 --> NULL
+~~~~
+
+* When using WHERE clause, logical operations that evaluate to NULL will be omitted.
+
+~~~~sql
+SELECT shop, game, price
+    FROM inventory
+    WHERE price <10;
+    ---NULL <10 --> NULL--is Omitted now.
+~~~~
+### Null values in Aggregation
+~~~~sql
+SELECT AVG(price)
+  FROM inventory;
+
+~~~~
+* In SQL, aggregate functions ignore NULL values.
+* But when you use WHRE clause where the condition turn to NULL, the result will be NULL.
+
+~~~~sql
+SELECT AVG(price)
+  FROM inventory
+  WHERE game ='Candy Land';
+  --return NULL
+~~~~
+
+* If you use the group by, the NULL is ignore.
+~~~~sql
+SELECT shop, AVG(price)
+  FROM inventory
+  GROUP BY shop;
+  --NULL is ignore.
+~~~~
+
+* Group by `game`
+~~~~sql
+SELECT game, AVG(price)
+  FROM inventory
+  GROUP BY game;
+  --display the NULL
+~~~~
+
+
+# Quiz
+~~~~sql
+SELECT MIN(price) FROM fun.inventory;
+---9.99
+~~~~
+
+* The query SELECT MIN(price) FROM fun.inventory; gave one row in the results, with only one column. The value was 9.99.
+
+  - Choose which of the following statements is most accurate and informative.
+    * The lowest price of a game in the inventory table is $9.99.
+    * `The lowest known price of a game in the inventory table is $9.99.`
+    * The lowest price of a game in the inventory table is unknown.
+
+
+* Write and run a query using Impala to find the average air speed (distance divided by air_time) of all flights in the fly.flights table, in miles per hour. Choose the answer below that is most accurate and informative.
+
+  * The nullif function is needed to prevent division by 0. The query should be similar to:
+  ~~~~sql
+   SELECT AVG(distance/(nullif(air_time,0)/60)) FROM fly.flights;
+  ~~~~
+
+  ~~~~sql
+   SELECT AVG(distance/(nullif(air_time,0)/60)) FROM fly.flights;
+  ~~~~
+
+
+
+  * In the ff case NULL group is created
+  ~~~~sql
+  SELECT aisle, COUNT(*)
+    FROM inventory
+    GROUP BY aisle;
+  ~~~~
+
+## Reading
+* The previous video described how aggregate expressions handle `NULL` values differently than non-aggregate (scalar) expressions. This reading describes the reasons for this difference, and warns about how it can cause `misinterpretations`.
+
+* For a scalar expression, it would be misleading to report anything except `NULL` in individual row values containing `NULLs` in the operands or arguments of the expression. (Review the lesson, “Working with Missing Values,” in Week 3 of this course for more about why this is so.)
+* However, for aggregate expressions, if `NULLs` were not ignored, then just one `NULL` value in a large group of rows would cause the query to return a `NULL` result as the aggregate for the whole group. By ignoring the `NULL` values, aggregate expressions are able to return meaningful results even when there are `NULL` values in the groups.
+* But sometimes this behavior can lead to misinterpretations, especially with sparse data. For example, if you compute the average of a column in a table with ten million rows, but only three of those rows have a `non-NULL` value in the column you’re averaging, then the query would return a `non-NULL` average in the result. This might mislead you into thinking that this average provides meaningful information about all ten million rows, when it reality the average comes from only three rows, and there is probably no reason to believe it is representative of all ten million rows.
+* Therefore, it is important to explicitly check for `NULL` values and handle them in your queries, instead of just relying on aggregate expressions to ignore them.
+
+* One way to do this is to use an aggregate expression like:
+~~~~sql
+SUM(column IS NOT NULL)
+~~~~
+* to return the number of rows in which column is non-NULL. In this expression, `column IS NOT NULL` evaluates to true (1) or false (0) for each row, and the SUM function adds these 1s and 0s up and returns the number of rows in which `column IS NOT NULL`.
+* For example, when you run the following query, the second column in the result tells you exactly how many non-NULL values were used to compute each of the averages in the third column:
+~~~~sql
+SELECT shop, SUM(price IS NOT NULL), AVG(price)
+    FROM inventory
+    GROUP BY shop;
+~~~~
+
+* The next video describes another way to check for NULL values in aggregates.
+
+
+# The COUNT Function
+
+~~~~sql
+SELECT COUNT(*) FROM inventory;
+---count the rows
+~~~~
+
+~~~~sql
+SELECT shop, COUNT(*) FROM inventory GROUP BY shop;
+---count the rows and group it by shop
+~~~~
+
+~~~~sql
+SELECT COUNT(price) FROM inventory;
+---but omit the NULL price
+~~~~
+
+
+~~~~sql
+SELECT shop, COUNT(price) FROM inventory GROUP BY shop;
+---but omit the NULL price
+~~~~
+
+* the COUNT() function does not include the Missing value.
+* The General rule is Aggregate functions ignore NULL values.
+* The one Exception is when you use `COUNT(*)`
+## quiz.
+* Which statement will return the same result as this one?
+~~~~sql
+SELECT AVG(price) AS avg_price
+    FROM fun.inventory;
+~~~~
+* If you are uncertain, check your answer by running it in Impala on the VM.
+~~~~sql
+SELECT SUM(price) / COUNT(*) AS avg_price FROM fun.inventory;
+SELECT SUM(price) / COUNT(price) AS avg_price FROM fun.inventory; ---correct . AVG(price) will ignore all NULL values, as will SUM(price) and COUNT(price).
+SELECT SUM(price) / SUM(1) AS avg_price FROM fun.inventory;
+~~~~
+* COUNT() function is also used to count the distinct values in the column.
+~~~~sql
+SELECT COUNT(DISTINCT aisle) FROM inventory;
+~~~~
+
+
+~~~~sql
+SELECT COUNT(DISTINCT red, green, blue) FROM wax.crayons;
+---Not with Postgre SQL
+~~~~
+
+~~~~sql
+SELECT COUNT(DISTINCT red),
+      COUNT(DISTINCT green),
+      COUNT(DISTINCT blue) FROM wax.crayons;
+---Not with Impala
+~~~~
+### Quiz:
+* Use Impala in the VM to find how many unique non-NULL combinations of year, month, and day exist in the fly.flights table.
+
+~~~~sql
+SELECT COUNT(DISTINCT year, month, day)
+    FROM fly.flights;
+~~~~
+
+* **Ways to use the DISTINCT keyword**
+  * Inside the COUNT function.
+    - For example:
+    ~~~~sql
+    SELECT COUNT(DISTINCT red, green, blue)
+          FROM crayons;
+    ~~~~
+      * Returns the number of the unique values(or combination of the values)
+    * Right after the SELECT keyword, with no aggregation.
+      - For example:
+      ~~~~sql
+      SELECT DISTINCT red, green, blue FROM crayons;
+      ~~~~
+      - Return the unique rows.
+    * In SQL, the opposite of `DISTINCT` is `ALL`
+    * But, the following are the same:
+    ~~~~sql
+    SELECT COUNT(ALL red, green, blue) FROM crayons;
+    ~~~~
+    * is the same as
+    ~~~~sql
+    SELECT COUNT(red, green, blue) FROM crayons;
+    ~~~~
+
+    ~~~~sql
+    SELECT ALL red, green, blue FROM crayons;
+    ~~~~
+    * is the same as
+    ~~~~sql
+    SELECT red, green, blue FROM crayons;
+    ~~~~
+
+  * Which SELECT statements will return the same result as
+~~~~sql
+SELECT COUNT(tz) AS time_zones FROM fly.airports;
+~~~~
+- Check all that apply. Try to choose the correct answers without running these SELECT statements. If you are uncertain, check your answers by running them on the VM.
+~~~~sql
+SELECT COUNT(DISTINCT tz) AS time_zones FROM fly.airports;
+
+--Un-selected is correct
+SELECT COUNT(DISTINCT tz) AS time_zones FROM fly.airports;
+
+--is not selected.This is correct.
+
+SELECT COUNT(ALL tz) AS time_zones FROM fly.airports;
+
+--Correct
+--Correct. The ALL keyword is the default, so COUNT(tz) is the same as COUNT(ALL tz).}
+
+SELECT COUNT(ALL tz) AS time_zones FROM fly.airports;
+
+--is selected.This is correct.
+--Correct. The ALL keyword is the default, so COUNT(tz) is the same as COUNT(ALL tz).}
+
+
+SELECT COUNT(*) AS time_zones FROM fly.airports WHERE tz IS NULL;
+
+--Un-selected is correct
+SELECT COUNT(*) AS time_zones FROM fly.airports WHERE tz IS NULL;
+
+--is not selected.This is correct.
+
+SELECT COUNT(*) AS time_zones FROM fly.airports WHERE tz IS NOT NULL;
+
+--This should be selected
+SELECT COUNT(*) AS time_zones FROM fly.airports WHERE tz IS NOT NULL;
+
+--is not selected.This is wrong. It should be selected.
+
+SELECT COUNT(*) AS time_zones FROM fly.airports;
+
+--Un-selected is correct
+~~~~
+
+* You can use DISTINCT with all aggregate Functions
+  - This rarely helpful except with COUNT
+  - with MIN or MAX, DISTINCT would have no effect.
+* COUNT is the only aggregate function often used with character strings.
+
+
+# Tips for Applying Grouping and Aggregation
+* Two Approaches:
+  * 1. Run query:
+  ~~~~sql
+  SELECT year, dep_delay FROM flights;
+  ~~~~
+    * and perform grouping and aggregation or result.
+  * 2. Run query:
+  ~~~~sql
+  SELECT year, AVG(dep_delay) FROM flights GROUP BY year;
+  ~~~~
+    * This approch is called `pushdown`.
+### Categorical:
+  * Containing a limited number of possible values, which typically represent categories.
+  * Examples of Categorical columns in the flights table:
+    - `Integer` columns `year, month, day`
+    - `character string` columns: `carrier, origin, dest`
+* Example:
+~~~~sql
+SELECT year, month, day, COUNT(*) as num_flights
+    FROM flights GROUP BY year, month, day;
+~~~~
+- Result set has 3653 rows
+~~~~sql
+SELECT COUNT(DISTINCT year, month, day)
+    FROM flights;
+~~~~
+
+* Examples of non-categorical columns
+  - Continuous numerical columns
+    -Like dep_time, arr_time, dep_delay, arr_delay in the flights table.
+
+  * If you use a non-categorical column in a group by clause, you can get a result set with an arbitrarily large number of rows. For example, if you GROUP BY dep_ time and arr_ time, then the results set would have more than three quarters of a million rows, a results set with that many roads could saturate your network connection and use up lots of memory.
+  ~~~~sql
+  SELECT dep_time, arr_time, COUNT(*) as num_flights
+      FROM flights
+      GROUP BY dep_time, arr_time;
+  ~~~~
+  * Result set has 753,355 rows.
+  * If you need to group a table by a non-categorical column, there are some ways to limit the number of rows in the results.
+
+  ~~~~sql
+  SELECT dep_time, arr_time, COUNT(*) as num_flights
+      FROM flights
+      WHERE year = 2009 AND month= 1 AND day =15
+      GROUP BY dep_time, arr_time;
+  ~~~~
+  * Result set has 16,711 rows
+
+  * Another way is to use `BINNING`
+
+  ~~~~sql
+  SELECT MIN(dep_time), MAX(dep_time), COUNT(*)
+      FROM flights
+      GROUP BY CASE WHEN dep_time IS NULL THEN 'missing'
+                    WHEN dep_time < 500 THEN 'night'
+                    WHEN dep_time < 1200 THEN 'morning'
+                    WHEN dep_time < 1700  THEN 'afternoon'
+                    WHEN dep_time < 2200 THEN 'evening'
+                  END;
+  ~~~~
+  * Result set has only 5 rows
+
+
+
+# Filtering on Aggregates
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+  GROUP BY shop;
+  --this dose work.
+~~~~
+
+* but..
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+  GROUP BY shop
+  WHERE SUM(price * qty) > 300;
+  --this dosen't work.
+~~~~
+* This fail because `the WHERE clause can only filter individual rows of data.`
+* But you can do it with the `HAVING` clause in SQL.
+
+# The HAVING Clause
+* is to filter groups in the data using criteria that are based on aggregates of the groups.
+* It must come after the GROUP BY clause in a SELECT statement, and it's processed after the GROUP BY clause.
+* Example:
+
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+  GROUP BY shop;
+~~~~
+* To filter based on aggregates, you use the HAVING clause.
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+  GROUP BY shop
+  HAVING SUM(price * qty) > 300;
+~~~~
+* WHich shops have an inventory with a retail value over 300 dollar and at least three differrnt games in stock?
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+  GROUP BY shop
+  HAVING SUM(price * qty) > 300 AND COUNT(*) >=3;
+~~~~
+* You can use both a WHERE clause and a HAVING clause in a SELECT statement. Entering some types of questions about the data requires using both. For example, you might want to answer the question, `which shops have at least two different games and stock that costs less than $20?`
+
+
+~~~~sql
+SELECT shop, COUNT(*) FROM inventory
+  WHERE price < 20
+  GROUP BY shop
+  HAVING COUNT(*) >=2;
+~~~~
+
+* Included in Result
+  - WHERE -> true
+* Excluded from Results
+  - WHERE -> false
+  - WHERE -> NULL
+
+  * Included in Result
+    - HAVING -> true
+  * Excluded from Results
+    - HAVING -> false
+    - HAVING -> NULL
+
+## Quiz
+
+* The fly.planes table contains data about planes, including the columns ​manufacturer (who built the plane) and seats (how many seats the plane has).  Which query will provide the average number of seats in all planes built by a manufacturer, but only for manufacturers who have at least one plane with more than 100 seats?  
+~~~~sql
+SELECT manufacturer, AVG(seats) FROM planes GROUP BY manufacturer HAVING MAX(seats) > 100;
+~~~~
+* Often when you write a SELECT statement with a HAVING clause, you will use the same aggregate expression in both the select list and in the having clause. BUT YOU ARE NOT REQUIRED TO DO SO.
+* eg.
+
+~~~~sql
+SELECT shop FROM inventory
+    GROUP BY shop
+    HAVING SUM(price * qty) > 300;
+~~~~
+
+~~~~sql
+SELECT shop, COUNT(*) FROM inventory
+    GROUP BY shop
+    HAVING SUM(price * qty) > 300;
+~~~~
+* More ...
+
+~~~~sql
+SELECT shop, SUM(price * qty), MIN(price), MAX(price), COUNT(*)
+  FROM inventory
+    GROUP BY shop
+    HAVING SUM(price * qty) > 300;
+~~~~
+* Aggregate expressions in these two different places have two different purposes. Their purpose in the SELECT list is to control what's in the columns of the result set. Their purpose in the HAVING clause is to control which of the rows is returned in the results set.
+
+# Quiz:
+* A “long-haul” flight is sometimes defined as a flight with air time of 7 hours or longer. Choose the SELECT statement that returns a result set describing how many long-haul flights each carrier has, along with the average air time of each carrier’s long-haul flights—but only for the carriers that have over 5000 long-haul flights represented in the flights table.
+
+
+~~~~sql
+SELECT carrier, COUNT(*), AVG(air_time) FROM flights WHERE air_time >= 7 * 60 GROUP BY carrier HAVING COUNT(*) > 5000;
+~~~~
+
+* Often you'll want to include the aggregate expression that you use in the HAVING clause in the SELECT list as well. So you can see the values in the column you filtered by.
+
+~~~~sql
+SELECT shop, SUM(price * qty) FROM inventory
+ GROUP BY shop HAVING SUM(price * qty) > 300;
+~~~~
+# Shortcut , using `alias`
+~~~~sql
+SELECT shop, SUM(price * qty) AS trv FROM inventory
+ GROUP BY shop HAVING trv > 300;
+ --but not with Postgre SQL
+~~~~
+
+# Quiz
+* The fly.flights table has enough information to calculate the flight speed for a flight, but it's a little long and you probably don't want to repeat it any more than you have to. The calculation for a single flight, in miles per hour, is distance/(nullif(air_time,0)/60)).
+
+* Which of the following queries for Impala is the most succinct (and correct) way to find the origin airport, destination airport, average flight speed in miles per hour, and number of flights for origin-destination pairs for which the average flight speed was over 575 miles per hour? (Recall that the nullif function is NULL if the two arguments are equal, and the first argument if they are not. Using nullif here prevents division by 0.)
+
+~~~~sql
+SELECT origin, dest,
+
+        AVG(distance/(nullif(air_time,0)/60)) AS avg_flight_speed,
+
+        COUNT(*) AS num_flights
+
+    FROM flights GROUP BY origin, dest
+
+    HAVING avg_flight_speed > 575;
+~~~~
+
+
+* Run the following query, then answer the question below. (Note that this query will also be used in the Discussion Prompt, “The Analytic Journey,” so you might want to go directly to that discussion when you're done here.)
+
+~~~~sql
+SELECT origin, dest,
+
+        AVG(distance/(nullif(air_time,0)/60)) AS avg_flight_speed,
+
+        COUNT(*) AS num_flights
+
+    FROM flights
+
+    GROUP BY origin, dest
+
+    HAVING avg_flight_speed > 575;
+~~~~
+* Which of these origin-destination pairs has highest reported flight speed?
+- MCO-JAX.
