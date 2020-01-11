@@ -979,3 +979,35 @@ SELECT origin, dest,
 ~~~~
 * Which of these origin-destination pairs has highest reported flight speed?
 - MCO-JAX.
+
+
+
+
+# HONOR course
+## Understanding Hive and Impala Version Differences
+* To see what version your are using:
+~~~~sql
+SELECT version();
+~~~~
+* Then review more about that version by going to:
+http://hive.apache.org
+* and click on the `language`
+* For Impalla go to: http://impala.apache.org
+# quiz
+* In what version of Hive was the built-in string function initcap added? Use the Hive documentation to answer this question.
+  * `Hive 1.1.0
+
+Correct
+Correct. On the LanguageManual UDF page, the description with the initcap string function says "as of 1.1.0."`
+* Select the built-in mathematical functions that were not included in the version of Impala that was bundled with CDH 5.4.0. Use the Impala documentation to answer this question. Check all that apply.
+
+* In what version of Impala was the built-in mathematical function mod added? Use the Impala documentation to answer this question.
+* `Impala 2.2.0
+
+Correct
+Correct. On the Impala Mathematical Functions page, the description of the mod function specifies that it was added in Impala 2.2.0.`
+
+# Understanding Hue Version Differences
+* HUE version 4 UIF is the latest.
+* For HUE 3:
+* =>`Data Browsers` => `Metastore Tables` => `Databases`
