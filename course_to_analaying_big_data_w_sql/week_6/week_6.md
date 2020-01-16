@@ -632,5 +632,221 @@ SELECT empl_id, first_name, last_name
     WHERE e.office_id IS NULL;
 
 ~~~~
-
 * Some SQL engines do not support all three types of outer joins. MySQL supports left and right but not full. Some others only support left. Hive, Impala, and PostgreSQL do support all three. Also, many SQL engines allow you to leave off the OUTER keywords. So you can just write LEFT JOIN, or RIGHT JOIN, or FULL JOIN. I prefer to include the OUTER keyword just to be fully explicit about what kind of join it is.
+
+# Handling NULL Values in Join Key Columns
+* When you join together two tables, if there are NULL values in the join key columns in both tables, the SQL engine will not match these NULLs.
+*  When you run a query to join these tables, the records with these NULL values in the join key column are not merged together in the result set.
+* To understand why this is, look at the join condition: `c.cust_id = o.cust_id`. That's the equality comparison that the SQL engine uses to identify matches when it performs the join.
+~~~~sql
+SELECT c.cust_id, name, total
+FROM customers_with_null c JOIN orders_with_null o
+  ON c.cust_id = o.cust_id;
+~~~~
+* `NULL = NULL` is `not true`; it's `NULL`. So the SQL engine does not merge together these two rows with the NULL join key values.
+* So in this case, perhaps you would want the join query to merge together these records with NULL in the join key column. You would want it to treat NULL as equal to NULL.
+* To do this, you can change the join condition to use this special operator instead of the equality operator.
+
+~~~~sql
+SELECT c.cust_id, name, total
+FROM customers_with_null c JOIN orders_with_null o
+  ON c.cust_id <=> o.cust_id;
+~~~~
+* <=> is a short hand for `IS NOT DISTINCT FROM`
+* This operator is sometimes called the `NULL-safe equality operator`.
+* And this type of join is called a `NULL-safe join`.
+* When this operator compares two NULL values, it returns true instead of NULL.
+* This type of join works with many SQL engines, including Hive, Impala, and MySQL. With PostgreSQL, you need to use the long form of this operator, IS NOT DISTINCT FROM, instead of the shorthand form.
+
+## Quize
+* In 2019, a hotel sent a satisfaction survey to every guest and recorded their responses in a table named survey_2019. The survey asks guests to indicate their household income category, but many guests choose not to, so NULL values are used in the income column to represent guests with unknown income category. The hotel also has a table named past_survey_summary that contains average responses from previous years by income category.
+
+* An analyst runs the following join query to compare this year’s survey ratings to previous years’ survey ratings:
+~~~~sql
+SELECT s.income, AVG(s.star_rating), AVG(p.star_rating)
+
+    FROM survey_2019 s LEFT OUTER JOIN past_survey_summary p
+
+        ON (s.income = p.income)
+
+    GROUP BY s.income;
+~~~~
+* Which of the following rows could be in the result set of this query?
+
+* Correct. A join with the equality operator (=) in the join condition would not find any matches for the rows that have NULL for s.income, so the values of p.star_rating in these rows would all be NULL.
+
+
+* Continuing the hotel survey scenario from the previous question:
+
+* Now the analyst runs this slightly different join query:
+~~~~sql
+SELECT s.income, AVG(s.star_rating), AVG(p.star_rating)
+
+    FROM survey_2019 s JOIN past_survey_summary p
+
+      ON (s.income <=> p.income)
+
+    GROUP BY s.income;
+~~~~
+
+* Which of the following rows would you expect to see in the result set of this query?
+
+* Correct. This join uses the null-safe equality operator (<=>) in the join condition, so it matches the rows that have NULL for s.income with the row that has NULL for p.income, yielding a known value of AVG(p.star_rating)in this row of the result set.
+
+# Non-Equijoins
+* In a typical join, the join conditions are expressed as one or more `equality conditions`. This is called an `equijoin`.
+* A `non-equijoin` is a join that uses some other comparison instead of equality.
+* In a non-equijoin, you can use comparisons such as `not equal`, `less than`, or `greater` than in the join conditions.
+* Here's an example:
+  * The employees table lists the salary for each employee, and the salary_grades table lists the salary grades or levels and their associated minimum and maximum salaries. To find the salary grade for each employee, you could use a non-equijoin with inequality comparisons for the join conditions.
+~~~~sql
+SELECT first_name, last_name, grade
+FROM employees e JOIN salary_grades g
+ON e.salary >= g.min_salary AND e.salary <= g.max_salary;
+~~~~
+
+* Impala, MySQL, PostgreSQL, and some other SQL engines support non-equijoin queries like this one. But with Hive, only equality conditions are allowed in joins.
+
+## QUIZE
+* Below is a query that is a non-equijoin and a self-join (a join that combines a table with itself). The result set describes which playing cards beat which other playing cards (assuming the cards have the values given in the card_rank table):
+~~~~sql
+SELECT a.rank AS winning_card, b.rank AS losing_card
+
+    FROM card_rank a JOIN card_rank b
+
+      ON a.value > b.value;
+~~~~
+* How many rows are in the result of this query? If you’re not sure, run the query on the VM to get the correct answer. (Note: This is more difficult than you might think, so don't get discouraged if you make mistakes !)
+
+
+# Cross Joins
+* Unlike other types of joins, a `cross join` does `not` try to match records based on the values in corresponding columns.
+* Instead, what a cross join does is it returns `every possible combination of the records` from the tables.
+* In other words, a cross join generates the cross product, also known as the `Cartesian product`, of the datasets. For this reason, it's also known as a `Cartesian join`.
+* The best way to write a SQL statement that performs a cross join is to explicitly specify CROSS JOIN in your statement, like I did in this example.
+~~~~sql
+SELECT rank, suit
+  FROM card_rank CROSS JOIN card_suit;
+~~~~
+* But many SQL engines will also perform a cross join if you simply omit the join condition. In other words, if you use only the JOIN keyword, and no other keywords between the two table names, and you leave off the join condition, so there's no ON keyword, then most SQL engines will perform a cross join.
+~~~~sql
+SELECT rank, suit
+  FROM card_rank JOIN card_suit;
+~~~~
+* This feature is dangerous because it means that by simply forgetting to include the join condition in an inner join query, you can inadvertently cause the SQL engine to return an enormous number of rows. So remember to specify the join condition whenever you do not want to do a cross join.
+* All of this also applies when you use the SQL-89-style inner join syntax, where you use a comma instead of the JOIN keyword, and you put the join condition in the WHERE clause.
+* If you use that syntax, but you forget to include the join condition in the WHERE clause, then the SQL engine will perform a cross join.
+* It can be helpful to understand an inner join as a cross join followed by a filter. I'll use an example to show what I mean by this. I'll use the SQL-89- style inner join syntax in this example, because it demonstrates the point more clearly.
+
+~~~~sql
+SELECT t.name, t.maker_id, m.id, m.name
+  FROM toys t, makers m;
+~~~~
+* This statement performs a cross join. It's written like an inner join, but with no join condition, so it returns every possible combination of toys and makers. There are three toys and three makers, so it returns three times three rows, nine rows.
+
+* Most of these rows contain values that do not correspond to one another. * In most of the rows, the maker_id value from the toys table is not equal to the id value from the makers table.
+* But if you add a `WHERE clause` to filter this cross join result so it only contains the rows in which the join key column values are equal, then what you have is an inner join.
+~~~~sql
+SELECT t.name, t.maker_id, m.id, m.name
+  FROM toys t, makers m
+  WHERE t.maker_id = m.id;
+~~~~
+
+* All the join key values in the result set match, and all the values in each row correspond. This is exactly the same result you get if you use the SQL-92-style inner join syntax. So an inner join is effectively the same as a cross join followed by a filter. This equivalence is especially evident when you use the SQL-89-style syntax, where an inner join is literally written as a cross join followed by a filter. What a SQL engine does internally when it performs an inner join is much more efficient than what would happen if it actually generated all possible combinations and then filtered them, but the end result is equivalent.
+# Left Semi-Joins
+
+* Some SQL engines support a less common type of join called the `left semi-join`.
+* A left `semi-join` is a special type of inner join that's used for its `efficiency`.
+* It behaves more like a `filter` than a join, because only the data from one of the tables is included in the result set.
+* A left `semi-join` returns only records from the table on the left for which there is a match in the table on the right.
+* Here's an example.
+  * Say you want to use the data in the fly database on the VM to find out which aircraft models are used for very long flights, for instance, flights with a distance of more than 4,000 nautical miles.
+  * There's a table named planes that has information about the different aircraft, including the manufacturer and the model.
+  * But there's no information about the range, the maximum flying distance of the aircraft, in that table.
+  * However, there is a distance column in the flights table that gives the distance of every flight in miles.
+  * And these `two` tables, `aircraft` and `flights`, can be joined using `tailnum` as the join key column.
+* So it's possible to answer this question by joining these two tables.
+* But a regular inner join does more than you need in this case.
+* You do not need to return any values from the flights table; you just need to use the values from the flights table to filter the matching rows in the planes table.
+* This is the kind of situation where it's possible and it's more efficient to use a `left semi-join`.
+* Here's the syntax of a left semi-join.
+~~~~sql
+SELECT DISTINCT manufacturer, model
+FROM planes p LEFT SEMI JOIN flights f
+ON p.tailnum = f.tailnum AND f.distance > 4000 * 1.15;
+~~~~
+
+* You preface the JOIN keyword with LEFT SEMI and then after the ON keyword, you specify both the join conditions and you can specify other criteria for filtering the table on the right side of the JOIN. This is different from what's included after the ON keyword in other joins. In the other kinds of joins, only the join criteria are included there, but in a left semi-join, you can include filtering criteria there as well.
+* The expression after the ON keyword is the only place where you're allowed to refer to the columns from the table on the right. So in this example, if you attempted to use this filter condition in the WHERE clause, the SQL engine would throw an error. Or if you attempted to include references to any of the columns from the flights table in the SELECT list or in other clauses, the SQL engine would throw an error. The only place they're allowed is in an expression after the ON keyword. In cases where this limitation is acceptable, a left semi-join can give you much better performance than an inner join.
+~~~~sql
+SELECT DISTINCT DISTINCT manufacturer, model
+FROM planes p LEFT SEMI JOIN flights f
+ON p.tailnum = f.tailnum AND f.distance > 4000 * 1.15;
+~~~~
+The result of this query shows that the aircraft used for these long flights were all large Boeing and Airbus jets as you might expect, but there is one strange row in the result set listing a Bombardier Jet, which I don't think has a range this long. Maybe that plane made a refueling stop on those flights -- I don't know. If you wanted to return more details about those flights, like the carrier, origin, and destination, then you would need to use an inner join instead; you cannot return those columns in a left semi-join because they're from the table on the right side.
+
+## QUIZE
+
+* Which of the following are valid semi-joins? Check all that apply.
+
+~~~~sql
+SELECT game, price
+
+    FROM fun.inventory i LEFT SEMI JOIN fun.games g
+
+      ON g.name = i.game AND price < list_price;
+
+Correct
+Correct. The only place where a column from the right table inventory is used is in the join condition, which is allowed.
+
+SELECT game, price
+
+    FROM fun.inventory i LEFT SEMI JOIN fun.games g
+
+      ON g.name = i.game AND price < list_price;
+
+is selected.This is correct.
+Correct. The only place where a column from the right table inventory is used is in the join condition, which is allowed.
+
+
+SELECT name, price, city
+
+    FROM toy.toys t LEFT SEMI JOIN toy.makers m
+
+      ON t.maker_id = m.id;
+
+Un-selected is correct
+SELECT name, price, city
+
+    FROM toy.toys t LEFT SEMI JOIN toy.makers m
+
+      ON t.maker_id = m.id;
+
+is not selected.This is correct.
+
+SELECT name, shop, list_price - price as discount
+
+    FROM fun.games g LEFT SEMI JOIN fun.inventory i
+
+      ON g.name = i.game;
+
+Un-selected is correct
+SELECT name, shop, list_price - price as discount
+
+    FROM fun.games g LEFT SEMI JOIN fun.inventory i
+
+      ON g.name = i.game;
+
+is not selected.This is correct.
+
+SELECT name, city
+
+    FROM toy.makers m LEFT SEMI JOIN toy.toys t
+
+      ON t.maker_id = m.id;
+
+Correct
+Correct. The only place where a column from the right table is used is in the join condition.
+~~~~
+
+* Hive and Impala allow left semi-joins, but many other SQL engines do not. Some SQL engines also allow right semi-joins, which allows you to reverse the order of the tables, so they return records from the table on the right that have matches in the table on the left. And some SQL engines are smart enough to process regular inner joins as efficient right- or left-semi joins when it's possible to do so.
