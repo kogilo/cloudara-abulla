@@ -28,7 +28,10 @@ SELECT * FROM games ORDER BY max_players;
 
 ## QUIZ
 
-* Which games might be in the second row of the result set returned by running the query below? Check all that apply. SELECT * FROM games ORDER BY min_age;
+* Which games might be in the second row of the result set returned by running the query below? Check all that apply. 
+  ~~~~sql
+  SELECT * FROM games ORDER BY min_age;
+  ~~~~
 
 `
 Scrabble
